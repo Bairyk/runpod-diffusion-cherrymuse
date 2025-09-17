@@ -1,0 +1,42 @@
+# requirements.txt - Complete dependencies for RunPod Stable Diffusion API
+
+# Core ML frameworks
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=2.0.0
+
+# Diffusers and transformers
+diffusers>=0.24.0
+transformers>=4.35.0
+accelerate>=0.24.0
+safetensors>=0.4.0
+
+# Memory optimization
+xformers>=0.0.22
+
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Image processing
+Pillow>=10.0.0
+opencv-python>=4.8.0
+
+# HTTP requests and async
+aiohttp>=3.9.0
+requests>=2.31.0
+
+# Data handling
+numpy>=1.24.0
+pydantic>=2.5.0
+
+# Hugging Face integration
+huggingface_hub>=0.19.0
+
+# Optional: For advanced features
+# scipy>=1.11.0
+# matplotlib>=3.7.0
+
+# Development/debugging (optional)
+# ipython>=8.0.0
+# jupyter>=1.0.0

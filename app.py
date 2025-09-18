@@ -1,7 +1,5 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-import torch
-from diffusers import StableDiffusionPipeline
 import base64
 import io
 from PIL import Image
@@ -10,33 +8,75 @@ from pydantic import BaseModel
 from typing import Optional
 import gc
 import time
+from diffusers import FluxPipeline
+from huggingface_hub import login
+import torch
 
 app = FastAPI(title="Stable Diffusion API")
 pipe = None
 
 class GenerateRequest(BaseModel):
     prompt: str
-    negative_prompt: Optional[str] = ""
-    steps: Optional[int] = 20
-    guidance: Optional[float] = 7.5
+    negative_prompt: Optional[str] = ""  # FLUX doesn't need negative prompts
+    steps: Optional[int] = 28  # FLUX.1-dev optimal steps
+    guidance: Optional[float] = 3.5  # FLUX guidance scale
+    width: Optional[int] = 1024
+    height: Optional[int] = 1024
     seed: Optional[int] = None
+
+# Update generation call
+@app.post("/generate")
+async def generate_image(request: GenerateRequest):
+    # ... existing code ...
+    
+    # FLUX generation
+    image = pipe(
+        prompt=request.prompt,
+        guidance_scale=request.guidance,
+        num_inference_steps=request.steps,
+        width=request.width,
+        height=request.height,
+        generator=generator
+    ).images[0]
 
 def load_model():
     global pipe
     if pipe is not None:
         return pipe
-
-    print("Loading Stable Diffusion 1.5...")
-    pipe = StableDiffusionPipeline.from_pretrained(
-        "runwayml/stable-diffusion-v1-5",
-        torch_dtype=torch.float16,
-        safety_checker=None,
-        requires_safety_checker=False
-    )
-    pipe = pipe.to("cuda")
-    pipe.enable_attention_slicing()
-    print("Model loaded successfully!")
-    return pipe
+    
+    print("Loading FLUX.1-dev...")
+    
+    # Authenticate with HF (if not already done)
+    try:
+        # This will use your saved token
+        login()
+    except:
+        print("HF authentication may be needed")
+    
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    
+    try:
+        pipe = FluxPipeline.from_pretrained(
+            "black-forest-labs/FLUX.1-dev",
+            torch_dtype=torch.bfloat16
+        )
+        pipe = pipe.to(device)
+        pipe.enable_model_cpu_offload()  # For your 8GB VRAM
+        
+        print("FLUX.1-dev loaded successfully!")
+        return pipe
+        
+    except Exception as e:
+        print(f"Failed to load FLUX.1-dev: {e}")
+        # Fallback to SD 1.5
+        from diffusers import StableDiffusionPipeline
+        pipe = StableDiffusionPipeline.from_pretrained(
+            "runwayml/stable-diffusion-v1-5", 
+            torch_dtype=torch.float16
+        )
+        pipe = pipe.to(device)
+        print("Fallback to SD 1.5")
+        return pipe
 
 @app.on_event("startup")
 async def startup():

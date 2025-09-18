@@ -24,20 +24,6 @@ class GenerateRequest(BaseModel):
     height: Optional[int] = 1024
     seed: Optional[int] = None
 
-# Update generation call
-@app.post("/generate")
-async def generate_image(request: GenerateRequest):
-    # ... existing code ...
-    
-    # FLUX generation
-    image = pipe(
-        prompt=request.prompt,
-        guidance_scale=request.guidance,
-        num_inference_steps=request.steps,
-        width=request.width,
-        height=request.height,
-        generator=generator
-    ).images[0]
 
 def load_model():
     global pipe
@@ -175,32 +161,31 @@ async def generate_image(request: GenerateRequest):
     try:
         start_time = time.time()
 
+        # Set up generator with seed - this was missing!
         generator = None
         if request.seed is not None:
             generator = torch.Generator(device="cuda").manual_seed(request.seed)
 
         print(f"Generating: {request.prompt[:50]}...")
 
-        with torch.autocast("cuda"):
-            result = pipe(
-                prompt=request.prompt,
-                negative_prompt=request.negative_prompt if request.negative_prompt else None,
-                num_inference_steps=request.steps,
-                guidance_scale=request.guidance,
-                generator=generator
-            )
+        # FLUX generation
+        image = pipe(
+            prompt=request.prompt,
+            guidance_scale=request.guidance,
+            num_inference_steps=request.steps,
+            width=request.width,
+            height=request.height,
+            generator=generator
+        ).images[0]
 
         generation_time = time.time() - start_time
-        image = result.images[0]
-
+        
         buffer = io.BytesIO()
         image.save(buffer, format='PNG')
         img_base64 = base64.b64encode(buffer.getvalue()).decode()
 
         torch.cuda.empty_cache()
         gc.collect()
-
-        print(f"Generated in {generation_time:.1f}s")
 
         return {
             "image_base64": img_base64,
